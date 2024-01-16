@@ -57,6 +57,19 @@ trap(struct trapframe *tf)
       release(&tickslock);
     }
     lapiceoi();
+    // alarm
+    // if there's a process running and if the timer interrupt came from user space
+    if(myproc() != 0 && (tf->cs & 3) == 3) {
+        // if alarm is set
+        if(myproc()->alarmticks != 0 && myproc()->alarmhandler != 0) {
+            myproc()->alarm_ticks_passed++;
+            if(myproc()->alarm_ticks_passed % myproc()->alarmticks == 0) {
+                tf->esp -= 4;
+                *((uint *)(tf->esp)) = tf->eip;
+                tf->eip = (uint)myproc()->alarmhandler;
+            }
+        }
+    }
     break;
   case T_IRQ0 + IRQ_IDE:
     ideintr();
