@@ -64,9 +64,17 @@ trap(struct trapframe *tf)
         if(myproc()->alarmticks != 0 && myproc()->alarmhandler != 0) {
             myproc()->alarm_ticks_passed++;
             if(myproc()->alarm_ticks_passed % myproc()->alarmticks == 0) {
+                // push eip to stack to make the process return to user program after executing alarm handler
                 tf->esp -= 4;
-                *((uint *)(tf->esp)) = tf->eip;
+                *((uint *)(tf->esp)) = tf->eip; // this eip is controlled by user program, so it's not safe, and we need to check if it's valid before using it as the return address
+                // set eip in trap frame to alarm handler to run it after the eip is popped from stack
+                // directly calling alarm handler will let the user program run with kernel privilege
                 tf->eip = (uint)myproc()->alarmhandler;
+                // this is not enough though
+                // we also need to save other registers and restore them after alarm handler returns
+                // however, we now rely on the fact that alarm handler will return to the return address we set before, which is the eip of the user program
+                // so one solution, which is the trampoline page in xv6, is to set the return address to a specific program that does the clean job and then return to the user program
+                // there may be other solutions
             }
         }
     }
