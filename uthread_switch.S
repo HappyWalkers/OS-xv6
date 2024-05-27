@@ -34,4 +34,6 @@ thread_switch:
 
     // The first time popal is called, it pops some values set by the caller
     popal
+
+    // return to the %eip in the stack whose stack pointer %esp is set as next_thread->sp previously
     ret

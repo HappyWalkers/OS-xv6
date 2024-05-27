@@ -61,6 +61,10 @@ thread_schedule(void)
 
   if (current_thread != next_thread) {         /* switch threads?  */
     next_thread->state = RUNNING;
+    // coroutine-style switch
+    // the fist time thread_schedule() is called, the function call will save the return
+    // address to the main() stack so when the user_thread() returns, it will return to
+    // thread_schedule() and thread_schedule() will return to main()
     thread_switch();
   } else
     next_thread = 0;
@@ -85,6 +89,7 @@ void
 thread_yield(void)
 {
   current_thread->state = RUNNABLE;
+  // coroutine-style yield
   thread_schedule();
 }
 
@@ -99,6 +104,9 @@ mythread(void)
   }
   printf(1, "my thread: exit\n");
   current_thread->state = FREE;
+  // the following thread_schedule() will never return
+  // it will switch to another thread
+  // when there is only main thread left runnable, thread_schedule() will switch to main()
   thread_schedule();
 }
 
