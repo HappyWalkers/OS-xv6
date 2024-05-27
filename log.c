@@ -43,7 +43,7 @@ struct log {
   int outstanding; // how many FS sys calls are executing.
   int committing;  // in commit(), please wait.
   int dev;
-  struct logheader lh;
+  struct logheader lh; // keep track of the block # to be committed
 };
 struct log log;
 
@@ -65,6 +65,7 @@ initlog(int dev)
   recover_from_log();
 }
 
+// Scan from the start of the log through the end of the log
 // Copy committed blocks from log to their home location
 static void
 install_trans(void)
@@ -112,13 +113,28 @@ write_head(void)
   brelse(buf);
 }
 
+// static void
+// recover_from_log(void)
+// {
+//   read_head();
+//   install_trans(); // if committed, copy from log to disk
+//   log.lh.n = 0;
+//   write_head(); // clear the log
+// }
+
+// answer to the question in the hw
+// question: Why was the file empty, even though you created it with echo hi > a?
+// answer: the cmd "echo hi > a", > is a redir command that will create the file 'a' first, then write 'hi' to it.
+//         When creating a file, begin_op() and end_op() are called, which will call commit() to write the log to disk.
+//         Then the system crash in commit(). So the command "echo" is not executed.
 static void
 recover_from_log(void)
 {
-  read_head();
-  install_trans(); // if committed, copy from log to disk
-  log.lh.n = 0;
-  write_head(); // clear the log
+  read_head();      
+  cprintf("recovery: n=%d but ignoring\n", log.lh.n);
+  install_trans();
+  log.lh.n = 0; // clear the log after installing all transactions in the log
+  write_head();
 }
 
 // called at the start of each FS system call.
@@ -173,7 +189,8 @@ end_op(void)
   }
 }
 
-// Copy modified blocks from cache to log.
+// Scan through the log
+// Copy blocks from cache to log.
 static void
 write_log(void)
 {
@@ -189,15 +206,34 @@ write_log(void)
   }
 }
 
-static void
-commit()
+// static void
+// commit()
+// {
+//   if (log.lh.n > 0) {
+//     write_log();     // Write modified blocks from cache to log
+//     write_head();    // Write header to disk -- the real commit
+//     install_trans(); // Now install writes to home locations
+//     log.lh.n = 0;
+//     write_head();    // Erase the transaction from the log
+//   }
+// }
+
+#include "mmu.h"
+#include "proc.h"
+void
+commit(void)
 {
+  int pid = myproc()->pid;
   if (log.lh.n > 0) {
-    write_log();     // Write modified blocks from cache to log
-    write_head();    // Write header to disk -- the real commit
-    install_trans(); // Now install writes to home locations
-    log.lh.n = 0;
-    write_head();    // Erase the transaction from the log
+    write_log();
+    write_head();
+    if(pid > 1)            // AAA
+      log.lh.block[0] = 0; // BBB
+    install_trans();
+    if(pid > 1)            // AAA
+      panic("commit mimicking crash"); // CCC
+    log.lh.n = 0; 
+    write_head();
   }
 }
 
